@@ -45,11 +45,13 @@ Search the codebase for framework indicators:
 | Framework | Detection Pattern | Package |
 |-----------|-------------------|---------|
 | **Vercel AI SDK v5+** | `"ai": "^5.x"` or `import { Agent } from "ai"` | `@handlebar/ai-sdk-v5` |
-| **LangChain JS** | `"@langchain/core"` or `import { AgentExecutor }` | `@handlebar/core` |
-| **LlamaIndex TS** | `"llamaindex"` or `import { FunctionTool }` | `@handlebar/core` |
-| **OpenAI SDK** | `"openai"` with tool calls | `@handlebar/core` |
-| **Anthropic SDK** | `"@anthropic-ai/sdk"` with tool_use | `@handlebar/core` |
-| **Google Gemini** | `"@google/generative-ai"` | `@handlebar/core` |
+| **LangChain JS** | `"@langchain/core"` or `import { AgentExecutor }` | `@handlebar/langchain` |
+| **LangChain Python** | `from langchain.X import Y` | `handlebar-langchain` |
+| **Google ADK Python** | `from google.adk.X import Y` | `handlebar-google-adk` |
+| **LlamaIndex TS** | `"llamaindex"` or `import { FunctionTool }` | Custom with `@handlebar/core` |
+| **OpenAI SDK** | `"openai"` with tool calls | Custom with `@handlebar/core` |
+| **Anthropic SDK** | `"@anthropic-ai/sdk"` with tool_use | Custom with `@handlebar/core` |
+| **Google Gemini** | `"@google/generative-ai"` | Custom with `@handlebar/core` |
 | **Custom** | Manual agent loop | `@handlebar/core` |
 
 **Output**: Report the detected framework to the user.
@@ -57,221 +59,26 @@ Search the codebase for framework indicators:
 ### Step 3: Configure Framework on Handlebar
 
 Based on detected framework, provide integration instructions.
+Some frameworks are supported directly with Handlebar packages.
+Those linked to a "core" package (`@handlebar/core` for JS and `handlebar-core` for Python)
+do not yet have direct support,
+however they can still be integrated by connecting to the agent's lifecycle methods.
 
 ---
 
-#### For Vercel AI SDK v5+
+First, let's learn how to connect an agent. For a Javascript, Typescript, or Python agent:
 
-**Package**: `@handlebar/ai-sdk-v5`  
-**Compatibility**: `ai@^5.0.0` (may work with `^6.0.0`)
-
-Handlebar has first-class support for Vercel AI SDK. The `HandlebarAgent` class is a **drop-in replacement** for `Experimental_Agent` (or `Agent` in v6).
-
-**What it does automatically:**
-- Loads relevant rulesets from the Handlebar API
-- Evaluates rules against agent actions client-side
-- Emits audit event logs to the Handlebar API
-
-**Installation:**
-
-```bash
-npm install @handlebar/ai-sdk-v5 @handlebar/core
-```
-
-**Basic integration (drop-in replacement):**
-
-```diff
-- import { Experimental_Agent as Agent } from 'ai';
-+ import { HandlebarAgent } from '@handlebar/ai-sdk-v5';
-
-- const agent = new Agent({
-+ const agent = new HandlebarAgent({
-  system,
-  model,
-  tools,
-});
-
-const result = await agent.generate({ prompt: "Help me with my order" });
-```
-
-**With agent identity (recommended):**
-
-Providing an agent identity gives Handlebar useful context. Without a `slug`, Handlebar generates one based on the agent's PWD.
-
-```typescript
-import { HandlebarAgent } from '@handlebar/ai-sdk-v5';
-
-const agent = new HandlebarAgent({
-  system,
-  model,
-  tools,
-  agent: {
-    slug: "customer-support",           // Unique identifier
-    name: "Customer Support Agent",     // Human-readable name
-    description: "Handles customer inquiries and refunds",
-    tags: ["customer-facing", "payments", "prod", "eu"],  // For grouping in Handlebar
-  },
-});
-```
-
-**With enduser identity (for per-user rules):**
-
-Pass enduser info to enable rules based on user attributes or behaviour (e.g., rate limits per user, role-based access).
-
-```typescript
-const result = await agent.generate(
-  { prompt: "Help me with my refund" },
-  {
-    enduser: {
-      externalId: "user-123",           // Your system's user ID
-      name: "Alice Smith",
-      metadata: { role: "premium", region: "eu" },
-      group: {                          // Optional: user's organisation
-        externalId: "org-456",
-        name: "Acme Corp",
-        metadata: { plan: "enterprise" },
-      },
-    },
-  }
-);
-```
+- For Vercel AI, read https://handlebar.mintlify.app/integrations/vercel-agents
+- For Google ADK, read https://handlebar.mintlify.app/integrations/google-adk-agents
+- For langchain (either language), read https://handlebar.mintlify.app/integrations/langchain-agents
+- For custom Python, read https://handlebar.mintlify.app/integrations/custom-python-integration
+- For custom JS/TS, read https://handlebar.mintlify.app/integrations/custom-javascript-integration
 
 ---
 
-#### For All Other Frameworks (LangChain, LlamaIndex, OpenAI SDK, etc.)
+#### For Non-JavaScript/Python Agents
 
-**Package**: `@handlebar/core`  
-**Compatibility**: Framework-agnostic
-
-Use `GovernanceEngine` directly to integrate Handlebar into any agent framework.
-
-**What it does:**
-- Runtime rule evaluation engine
-- Communicates with Handlebar API (fetch rules, update agent identity)
-- Emits audit event logs to Handlebar API
-
-**Installation:**
-
-```bash
-npm install @handlebar/core
-```
-
-**Environment variables:**
-
-```bash
-HANDLEBAR_API_KEY=hb_your_api_key_here
-```
-
-If `HANDLEBAR_API_KEY` is set, audit logs go to Handlebar API. Otherwise, they log to console.
-
-**Integration steps:**
-
-**1. Initialise the engine and configure agent rules:**
-
-```typescript
-import { GovernanceEngine } from "@handlebar/core";
-
-const engine = new GovernanceEngine();
-
-// Configure agent identity and tools (call once during agent init)
-await engine.initAgentRules(
-  {
-    slug: "customer-support",
-    name: "Customer Support Agent",
-    description: "Handles customer inquiries",
-    tags: ["customer-facing", "prod"],
-  },
-  [
-    // Tools the agent has access to
-    {
-      name: "getUserProfile",
-      key: "getUserProfile",
-      version: 1,
-      kind: "function",
-      description: "Fetches user profile data",
-      metadata: { category: "pii" },
-    },
-    {
-      name: "issueRefund",
-      key: "issueRefund", 
-      version: 1,
-      kind: "function",
-      description: "Issues a refund to customer",
-      metadata: { category: "financial" },
-    },
-  ]
-);
-```
-
-**2. Create a run context for each session:**
-
-```typescript
-// Create context for this agent run (with optional enduser)
-const runCtx = engine.createRunContext(
-  "run-" + crypto.randomUUID(),
-  {
-    enduser: {
-      externalId: "user-123",
-      name: "Alice Smith",
-      metadata: { role: "premium" },
-      group: {
-        externalId: "org-456",
-        name: "Acme Corp",
-      },
-    },
-  }
-);
-```
-
-**3. Wrap tool execution with governance checks:**
-
-```typescript
-async function executeToolWithGovernance(toolName: string, args: unknown) {
-  // BEFORE: Evaluate rules and emit tool.decision event
-  const decision = await engine.beforeTool(runCtx, toolName, args);
-  
-  if (decision.effect === "block") {
-    return { blocked: true, reason: decision.reason };
-  }
-  
-  if (decision.effect === "hitl") {
-    // Handle HITL approval flow
-    return { requiresApproval: true, reason: decision.reason };
-  }
-  
-  // EXECUTE: Run the actual tool
-  const startTime = Date.now();
-  let result: unknown;
-  let error: unknown;
-  
-  try {
-    result = await actualToolImplementation(toolName, args);
-  } catch (e) {
-    error = e;
-  }
-  
-  // AFTER: Evaluate post-execution rules and emit tool.result event
-  await engine.afterTool(
-    runCtx,
-    toolName,
-    Date.now() - startTime,  // execution time in ms
-    args,
-    result,
-    error
-  );
-  
-  if (error) throw error;
-  return result;
-}
-```
-
-**Output**: Provide the appropriate code snippet for the detected framework.
-
----
-
-#### For Non-JavaScript/TypeScript Agents
-
-If the agent is built in a language other than JavaScript or TypeScript (e.g., Python, Go, Rust, Java):
+If the agent is built in a language other than JavaScript, TypeScript, or Python (e.g. Go, Rust, Java):
 
 **INFORM THE USER**:
 
@@ -405,6 +212,15 @@ If jurisdiction cannot be inferred, **ASK THE USER**:
 > - US  
 > - EU
 > - Other (please specify)"
+
+### Step 5: Connect the agent code to Handlebar
+
+According to the integration documentation you reviewed earlier, we will now connect the agent to Handlebar.
+
+1. Connect the minimal lifecycle hooks (either using the provided wrapper in a client library, or the lifecycle hooks defined in the core packages/custom integration). Let the Handlebar client use default values where possible: do NOT write out every config argument explicitly.
+2. Provide appropriate agent metadata: provide a slug to Handlebar based on the agent's purpose, and provide agent tags if possible
+3. If there is a clear user id passed into the agent flow already, then configure Handlebar with that enduser/actor ID. Otherwise, let your user know that Handlebar can be configured to track endusers, and inform the user of the code change they would need to make to enable that.
+4. Provide Handlebar the tool metadata according to the data you collected in previous steps.
 
 ### Final Output
 
