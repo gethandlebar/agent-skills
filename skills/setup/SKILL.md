@@ -66,7 +66,7 @@ however they can still be integrated by connecting to the agent's lifecycle meth
 
 ---
 
-For a Javascript, Typescript, or Python agent:
+First, let's learn how to connect an agent. For a Javascript, Typescript, or Python agent:
 
 - For Vercel AI, read https://handlebar.mintlify.app/integrations/vercel-agents
 - For Google ADK, read https://handlebar.mintlify.app/integrations/google-adk-agents
@@ -212,6 +212,15 @@ If jurisdiction cannot be inferred, **ASK THE USER**:
 > - US  
 > - EU
 > - Other (please specify)"
+
+### Step 5: Connect the agent code to Handlebar
+
+According to the integration documentation you reviewed earlier, we will now connect the agent to Handlebar.
+
+1. Connect the minimal lifecycle hooks (either using the provided wrapper in a client library, or the lifecycle hooks defined in the core packages/custom integration). Let the Handlebar client use default values where possible: do NOT write out every config argument explicitly.
+2. Provide appropriate agent metadata: provide a slug to Handlebar based on the agent's purpose, and provide agent tags if possible
+3. If there is a clear user id passed into the agent flow already, then configure Handlebar with that enduser/actor ID. Otherwise, let your user know that Handlebar can be configured to track endusers, and inform the user of the code change they would need to make to enable that.
+4. Provide Handlebar the tool metadata according to the data you collected in previous steps.
 
 ### Final Output
 
